@@ -1,3 +1,7 @@
+#!/bin/bash
+
+set -euo pipefail
+
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <start|stop>"
     exit 1
@@ -19,11 +23,12 @@ if [ "$action" = "start" ]; then
     
     echo "Starting VPN..."
     cd ~/manual-connections
-    sudo VPN_PROTOCOL=openvpn_udp_strong DISABLE_IPV6=yes DIP_TOKEN=no AUTOCONNECT=true PIA_PF=false PIA_DNS=true PIA_USER=$PIA_USERNAME PIA_PASS=$PIA_PASS ./run_setup.sh
-    cd ~/
+    sudo VPN_PROTOCOL=openvpn_udp_strong DISABLE_IPV6=yes DIP_TOKEN=no AUTOCONNECT=true PIA_PF=false PIA_DNS=true PIA_USER="$PIA_USERNAME" PIA_PASS="$PIA_PASS" ./run_setup.sh
     
     echo "Running speedtest..."
-    speedtest    
+    speedtest
+
+    cd ~/
 elif [ "$action" = "stop" ]; then
     echo "Stopping the process..."
     pgrep -f openvpn | xargs sudo kill
