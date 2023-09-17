@@ -10,7 +10,7 @@ echo "Installing Updates"
 sudo apt update && sudo apt -y full-upgrade >/dev/null 
 
 echo "Installing Packages"
-sudo apt -y install git vim pipenv curl exfat-fuse exfat-utils speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn >/dev/null 
+sudo apt -y install git vim pipenv curl exfat-fuse exfat-utils speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
 
 echo "Configuring External Disks"
 mnt_point=/mnt/Drive
@@ -107,6 +107,7 @@ git config --global core.editor "vim"
 
 # Configure SSH Key
 ssh-keygen -t ed25519 -C "pi@raspberrypi.local" -N
+touch ~/.ssh/authorized_keys
 
 zsh_content=$(cat <<'EOL'
 # If you come from bash you might have to change your $PATH.
