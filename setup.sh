@@ -10,7 +10,7 @@ echo "Installing Updates"
 sudo apt-get update && sudo apt-get -y full-upgrade >/dev/null 
 
 echo "Installing Packages"
-sudo apt-get -y install git vim pipenv curl exfat-fuse exfat-utils speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
+sudo apt-get -y install git vim pipenv curl speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
 USER=$(whoami)
 echo "Configuring Samba Server"
 smb_content="[PiDisk]
