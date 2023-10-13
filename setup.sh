@@ -10,11 +10,11 @@ echo "Installing Updates"
 sudo apt-get update && sudo apt-get -y full-upgrade >/dev/null 
 
 echo "Installing Packages"
-sudo apt-get -y install git vim pipenv curl speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
+sudo apt-get -y install git vim pipenv curl speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn >/dev/null 
 USER=$(whoami)
 echo "Configuring Samba Server"
 smb_content="[PiDisk]
-path = $USER/Media
+path = /home/$USER/Media
 writeable = Yes
 create mask = 0777
 directory mask = 0777
@@ -79,18 +79,18 @@ echo -e "\nexport PIA_PASS=$pia_password" | tee -a ".env"
 
 echo "Enter git config user.name"
 read -r git_user_name
-git config user.name "$git_user_name"
+git config --global user.name "$git_user_name"
 
 echo "Enter git config user.email"
 read -r git_email
-git config user.email "$git_email"
+git config --global user.email "$git_email"
 
 git config --global init.defaultBranch "main"
 git config --global pull.rebase true 
 git config --global core.editor "vim"
 
 # Configure SSH Key
-ssh-keygen -t ed25519 -C "pi@raspberrypi.local" -N
+ssh-keygen -t ed25519 -C "$USER@raspberrypi.local" -f "/home/$USER/.ssh/id_ed25519" -P ""
 touch ~/.ssh/authorized_keys
 
 zsh_content=$(cat <<'EOL'
@@ -121,4 +121,6 @@ EOL
 
 echo "$zsh_content" > ~/.zshrc
 echo "Added config to ~/.zshrc. Setting zsh as default shell"
+
+echo "Setting the shell to zsh, please enter your password when prompted."
 chsh -s /bin/zsh
