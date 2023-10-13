@@ -11,22 +11,10 @@ sudo apt update && sudo apt -y full-upgrade >/dev/null
 
 echo "Installing Packages"
 sudo apt -y install git vim pipenv curl exfat-fuse exfat-utils speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
-
-echo "Configuring External Disks"
-mnt_point=/mnt/Drive
-sudo mkdir -p /mnt/Drive
-sudo chown -R pi:pi /mnt/Drive
-uuid=$(sudo blkid -o value -s UUID -l -t LABEL=Backup)
-if [ -z "$uuid" ]; then
-    echo "Error: Disk 'Backup' not found or not mounted."
-else    
-    echo "UUID=$uuid $mnt_point exfat defaults,uid=1000,gid=1000 0  0" | sudo tee -a /etc/fstab
-    echo "UUID=$uuid appended to /etc/fstab"
-fi
-
+USER=$(whoami)
 echo "Configuring Samba Server"
 smb_content="[PiDisk]
-path = $mnt_point
+path = $USER/Media
 writeable = Yes
 create mask = 0777
 directory mask = 0777
@@ -42,12 +30,8 @@ fi
 echo "$smb_content" | sudo tee -a "$smb_conf"
 echo "Content added to $smb_conf successfully."
 cat $smb_conf
-sudo smbpasswd -a pi
+sudo smbpasswd -a "$USER"
 sudo systemctl restart smbd
-
-echo "Adding Swift language support"
-curl -s https://archive.swiftlang.xyz/install.sh | sudo bash
-sudo apt -y install swiftlang >/dev/null 
 
 echo "Configure qbittorrent"
 qbit_content="[Unit]
@@ -56,8 +40,8 @@ After=network.target
 
 [Service]
 Type=forking
-User=pi
-Group=pi
+User=$USER
+Group=$USER
 UMask=002
 ExecStart=/usr/bin/qbittorrent-nox -d --webui-port=8080
 Restart=on-failure
