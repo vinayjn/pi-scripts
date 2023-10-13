@@ -7,10 +7,10 @@ echo deb https://downloads.plex.tv/repo/deb public main | sudo tee /etc/apt/sour
 curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo apt-key add -
 
 echo "Installing Updates"
-sudo apt update && sudo apt -y full-upgrade >/dev/null 
+sudo apt-get update && sudo apt-get -y full-upgrade >/dev/null 
 
 echo "Installing Packages"
-sudo apt -y install git vim pipenv curl exfat-fuse exfat-utils speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
+sudo apt-get -y install git vim pipenv curl exfat-fuse exfat-utils speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn golang >/dev/null 
 USER=$(whoami)
 echo "Configuring Samba Server"
 smb_content="[PiDisk]
