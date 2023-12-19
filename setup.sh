@@ -29,7 +29,6 @@ else
 fi
 echo "$smb_content" | sudo tee -a "$smb_conf"
 echo "Content added to $smb_conf successfully."
-cat $smb_conf
 sudo smbpasswd -a "$USER"
 sudo systemctl restart smbd
 
