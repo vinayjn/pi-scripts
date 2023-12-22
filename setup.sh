@@ -7,7 +7,8 @@ echo deb https://downloads.plex.tv/repo/deb public main | sudo tee /etc/apt/sour
 curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo apt-key add -
 
 echo "Installing Updates"
-sudo apt-get update && sudo apt-get -y full-upgrade >/dev/null 
+sudo apt-get update >/dev/null
+sudo apt-get -y full-upgrade >/dev/null 
 
 echo "Installing Packages"
 sudo apt-get -y install git vim pipenv curl speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn >/dev/null 
@@ -53,7 +54,6 @@ qbit_service="/etc/systemd/system/qbittorrent.service"
 echo "$qbit_content" | sudo tee -a "$qbit_service"
 echo "Content added to $qbit_service successfully."
 sudo systemctl start qbittorrent
-sudo systemctl status qbittorrent
 sudo systemctl enable qbittorrent
 
 echo "Configure DHCP: Set static IP"
@@ -103,6 +103,9 @@ ssh-keygen -t ed25519 -C "$USER@raspberrypi.local" -f "/home/$USER/.ssh/id_ed255
 touch ~/.ssh/authorized_keys
 
 zsh_content=$(cat <<'EOL'
+LC_CTYPE=en_US.UTF-8
+LC_ALL=en_US.UTF-8
+
 export PATH="$HOME/bin:/usr/local/bin:$PATH"
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
@@ -115,7 +118,7 @@ plugins=(
 )
 source "$ZSH/oh-my-zsh.sh"
 source "$HOME/.env"
-export LANG=en_US.UTF-8
+
 EOL
 )
 
