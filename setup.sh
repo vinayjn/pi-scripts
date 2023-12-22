@@ -12,6 +12,7 @@ sudo apt-get update && sudo apt-get -y full-upgrade >/dev/null
 echo "Installing Packages"
 sudo apt-get -y install git vim pipenv curl speedtest-cli zsh samba samba-common-bin qbittorrent qbittorrent-nox plexmediaserver jq wireguard-tools openvpn >/dev/null 
 USER=$(whoami)
+
 echo "Configuring Samba Server"
 smb_content="[PiDisk]
 path = /home/$USER/Media
@@ -51,10 +52,19 @@ WantedBy=multi-user.target
 qbit_service="/etc/systemd/system/qbittorrent.service"
 echo "$qbit_content" | sudo tee -a "$qbit_service"
 echo "Content added to $qbit_service successfully."
-cat $qbit_service
 sudo systemctl start qbittorrent
 sudo systemctl status qbittorrent
 sudo systemctl enable qbittorrent
+
+echo "Configure DHCP: Set static IP"
+dhcp_content="interface eth0
+static ip_address=192.168.1.134/24
+static routers=192.168.1.1
+static domain_name_servers=1.1.1.1
+"
+dhcp_config="/etc/dhcpcd.conf"
+echo "$dhcp_content" | sudo tee -a "$dhcp_config"
+echo "Content added to $dhcp_config successfully."
 
 echo "Cloning Important Repos"
 
@@ -88,23 +98,14 @@ git config --global init.defaultBranch "main"
 git config --global pull.rebase true 
 git config --global core.editor "vim"
 
-echo "Installing Docker"
-curl -sSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-
 # Configure SSH Key
 ssh-keygen -t ed25519 -C "$USER@raspberrypi.local" -f "/home/$USER/.ssh/id_ed25519" -P ""
 touch ~/.ssh/authorized_keys
 
 zsh_content=$(cat <<'EOL'
-# If you come from bash you might have to change your $PATH.
 export PATH="$HOME/bin:/usr/local/bin:$PATH"
-
-# Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
-
 ZSH_THEME="robbyrussell"
-
 plugins=(
     git
     history
@@ -112,20 +113,18 @@ plugins=(
     zsh-autosuggestions
     zsh-syntax-highlighting
 )
-
 source "$ZSH/oh-my-zsh.sh"
-
 source "$HOME/.env"
-
-export PIPENV_VENV_IN_PROJECT=1
-
-# You may need to manually set your language environment
 export LANG=en_US.UTF-8
 EOL
 )
 
 echo "$zsh_content" > ~/.zshrc
 echo "Added config to ~/.zshrc. Setting zsh as default shell"
+
+echo "Installing Docker"
+curl -sSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
 
 echo "Setting the shell to zsh, please enter your password when prompted."
 chsh -s /bin/zsh
