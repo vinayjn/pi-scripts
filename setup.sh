@@ -88,6 +88,10 @@ git config --global init.defaultBranch "main"
 git config --global pull.rebase true 
 git config --global core.editor "vim"
 
+echo "Installing Docker"
+curl -sSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
 # Configure SSH Key
 ssh-keygen -t ed25519 -C "$USER@raspberrypi.local" -f "/home/$USER/.ssh/id_ed25519" -P ""
 touch ~/.ssh/authorized_keys
