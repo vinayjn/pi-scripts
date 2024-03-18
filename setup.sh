@@ -56,16 +56,6 @@ echo "Content added to $qbit_service successfully."
 sudo systemctl start qbittorrent
 sudo systemctl enable qbittorrent
 
-echo "Configure DHCP: Set static IP"
-dhcp_content="interface eth0
-static ip_address=192.168.1.134/24
-static routers=192.168.1.1
-static domain_name_servers=1.1.1.1
-"
-dhcp_config="/etc/dhcpcd.conf"
-echo "$dhcp_content" | sudo tee -a "$dhcp_config"
-echo "Content added to $dhcp_config successfully."
-
 echo "Cloning Important Repos"
 
 git clone https://github.com/pia-foss/manual-connections
@@ -99,7 +89,7 @@ git config --global pull.rebase true
 git config --global core.editor "vim"
 
 # Configure SSH Key
-ssh-keygen -t ed25519 -C "$USER@raspberrypi.local" -f "/home/$USER/.ssh/id_ed25519" -P ""
+ssh-keygen -t ed25519 -C "$USER@$(hostname).local" -f "/home/$USER/.ssh/id_ed25519" -P ""
 touch ~/.ssh/authorized_keys
 
 zsh_content=$(cat <<'EOL'
