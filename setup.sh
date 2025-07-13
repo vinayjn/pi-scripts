@@ -56,14 +56,12 @@ fi
 
 # Install packages
 if ! step_completed "install_packages"; then
-    if prompt_user "Install Packages"; then
-        echo "Installing Packages"
-        if sudo apt-get -y install git vim pipenv curl zsh >/dev/null; then
-            mark_step_completed "install_packages"
-        else
-            echo "Error: Failed to install packages. Exiting."
-            exit 1
-        fi
+    echo "Installing Packages"
+    if sudo apt-get -y install git vim pipenv curl zsh >/dev/null; then
+        mark_step_completed "install_packages"
+    else
+        echo "Error: Failed to install packages. Exiting."
+        exit 1
     fi
 else
     echo "Packages already installed. Skipping."
@@ -125,7 +123,7 @@ if ! step_completed "configure_samba_server"; then
         
         echo "Configuring Samba Server"
         smb_content="[PiDisk]
-        path = /home/$USER/Media
+        path = $HOME/Media
         writeable = Yes
         create mask = 0777
         directory mask = 0777
@@ -149,6 +147,8 @@ else
     echo "Samba server already configured. Skipping."
 fi
 
+touch $HOME/.env
+
 # Configure VPN
 if ! step_completed "configure_vpn"; then
     if prompt_user "Configure VPN"; then
@@ -168,28 +168,31 @@ if ! step_completed "configure_vpn"; then
 
         echo "Enter PIA Password:"
         read -r pia_password
-        
-
-        # Export VPN Credentials
-        echo -e "\nexport PIA_USERNAME=$pia_username" | tee -a ".env"
-        echo -e "\nexport PIA_PASS=$pia_password" | tee -a ".env"
+        echo -e "\nexport PIA_USERNAME=$pia_username" | tee -a "$HOME/.env"
+        echo -e "\nexport PIA_PASS=$pia_password" | tee -a "$HOME/.env"
         mark_step_completed "configure_vpn"
     fi
 else
     echo "VPN already configured. Skipping."
 fi
 
-echo "Enter git config user.name"
-read -r git_user_name
-git config --global user.name "$git_user_name"
+# Configure Git
+if ! step_completed "configure_git"; then
+    echo "Enter git config user.name"
+    read -r git_user_name
+    git config --global user.name "$git_user_name"
 
-echo "Enter git config user.email"
-read -r git_email
-git config --global user.email "$git_email"
+    echo "Enter git config user.email"
+    read -r git_email
+    git config --global user.email "$git_email"
 
-git config --global init.defaultBranch "main"
-git config --global pull.rebase true 
-git config --global core.editor "vim"
+    git config --global init.defaultBranch "main"
+    git config --global pull.rebase true 
+    git config --global core.editor "vim"
+    mark_step_completed "configure_git"
+else
+    echo "Git already configured. Skipping."
+fi
 
 # Install Docker
 if ! step_completed "install_docker"; then
@@ -204,15 +207,23 @@ else
 fi
 
 # Configure SSH Key
-ssh-keygen -t ed25519 -C "$USER@$(hostname).local" -f "/home/$USER/.ssh/id_ed25519" -P ""
-touch ~/.ssh/authorized_keys
+if ! step_completed "configure_ssh"; then
+    echo "Generating SSH key"
+    ssh-keygen -t ed25519 -C "$USER@$(hostname).local" -f "$HOME/.ssh/id_ed25519" -P ""
+    touch $HOME/.ssh/authorized_keys
+    mark_step_completed "configure_ssh"
+else
+    echo "SSH key already generated. Skipping."
+fi
 
-echo "Configuring ZSH"
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-syntax-highlighting
-git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-autosuggestions
+# Configure ZSH
+if ! step_completed "configure_zsh"; then
+    echo "Configuring ZSH"
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-syntax-highlighting
+    git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-autosuggestions
 
-zsh_content=$(cat <<'EOL'
+    zsh_content=$(cat <<'EOL'
 LC_CTYPE=en_US.UTF-8
 LC_ALL=en_US.UTF-8
 
@@ -230,13 +241,15 @@ source "$ZSH/oh-my-zsh.sh"
 source "$HOME/.env"
 
 EOL
-)
+    )
 
-echo "$zsh_content" > ~/.zshrc
-echo "Added config to ~/.zshrc. Setting zsh as default shell"
-
-
-echo "Setting the shell to zsh, please enter your password when prompted."
-chsh -s /bin/zsh
+    echo "$zsh_content" > $HOME/.zshrc
+    echo "Added config to $HOME/.zshrc. Setting zsh as default shell"
+    echo "Setting the shell to zsh, please enter your password when prompted."
+    chsh -s /bin/zsh
+    mark_step_completed "configure_zsh"
+else
+    echo "ZSH already configured. Skipping."
+fi
 
 echo "Setup complete!"
