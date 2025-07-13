@@ -72,7 +72,7 @@ if ! step_completed "configure_media_server"; then
     if prompt_user "Configure as Media Server"; then
         echo "Installing Plex"    
         echo "deb https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
-        curl https://downloads.plex.tv/plex-keys/PlexSign.key | sudo apt-key add -
+        curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor -o /usr/share/keyrings/plex-archive-keyring.gpg
         
         if sudo apt-get update && sudo apt-get -y install qbittorrent qbittorrent-nox plexmediaserver >/dev/null; then
             echo "Installing qbittorrent"
@@ -122,6 +122,9 @@ if ! step_completed "configure_samba_server"; then
         fi
         
         echo "Configuring Samba Server"
+        # Create Media directory if it doesn't exist
+        mkdir -p "$HOME/Media"
+        
         smb_content="[PiDisk]
         path = $HOME/Media
         writeable = Yes
@@ -161,7 +164,11 @@ if ! step_completed "configure_vpn"; then
         fi
         
         echo "Cloning Important Repos"
-        git clone https://github.com/pia-foss/manual-connections
+        if [ ! -d "manual-connections" ]; then
+            git clone https://github.com/pia-foss/manual-connections
+        else
+            echo "manual-connections directory already exists. Skipping clone."
+        fi
 
         echo "Enter PIA Username:"
         read -r pia_username
@@ -209,8 +216,12 @@ fi
 # Configure SSH Key
 if ! step_completed "configure_ssh"; then
     echo "Generating SSH key"
+    # Create .ssh directory if it doesn't exist
+    mkdir -p "$HOME/.ssh"
     ssh-keygen -t ed25519 -C "$USER@$(hostname).local" -f "$HOME/.ssh/id_ed25519" -P ""
-    touch $HOME/.ssh/authorized_keys
+    touch "$HOME/.ssh/authorized_keys"
+    chmod 700 "$HOME/.ssh"
+    chmod 600 "$HOME/.ssh/authorized_keys"
     mark_step_completed "configure_ssh"
 else
     echo "SSH key already generated. Skipping."
@@ -220,8 +231,15 @@ fi
 if ! step_completed "configure_zsh"; then
     echo "Configuring ZSH"
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-syntax-highlighting
-    git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-autosuggestions
+    
+    # Clone ZSH plugins with error handling
+    if [ ! -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting" ]; then
+        git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-syntax-highlighting
+    fi
+    
+    if [ ! -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions" ]; then
+        git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"/plugins/zsh-autosuggestions
+    fi
 
     zsh_content=$(cat <<'EOL'
 LC_CTYPE=en_US.UTF-8
