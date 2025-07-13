@@ -185,13 +185,20 @@ fi
 
 # Configure Git
 if ! step_completed "configure_git"; then
-    echo "Enter git config user.name"
-    read -r git_user_name
-    git config --global user.name "$git_user_name"
+    if [ "$interactive" = true ]; then
+        echo "Enter git config user.name"
+        read -r git_user_name
+        git config --global user.name "$git_user_name"
 
-    echo "Enter git config user.email"
-    read -r git_email
-    git config --global user.email "$git_email"
+        echo "Enter git config user.email"
+        read -r git_email
+        git config --global user.email "$git_email"
+    else
+        echo "Skipping Git user configuration in non-interactive mode"
+        echo "You can configure Git manually later with:"
+        echo "  git config --global user.name 'Your Name'"
+        echo "  git config --global user.email 'your.email@example.com'"
+    fi
 
     git config --global init.defaultBranch "main"
     git config --global pull.rebase true 
