@@ -58,7 +58,7 @@ fi
 if ! step_completed "install_packages"; then
     if prompt_user "Install Packages"; then
         echo "Installing Packages"
-        if sudo apt-get -y install git vim pipenv curl speedtest-cli zsh samba samba-common-bin jq wireguard-tools openvpn >/dev/null; then
+        if sudo apt-get -y install git vim pipenv curl zsh >/dev/null; then
             mark_step_completed "install_packages"
         else
             echo "Error: Failed to install packages. Exiting."
@@ -115,6 +115,14 @@ fi
 # Configure Samba Server
 if ! step_completed "configure_samba_server"; then
     if prompt_user "Configure Samba Server"; then
+        echo "Installing Samba packages"
+        if sudo apt-get -y install samba samba-common-bin >/dev/null; then
+            echo "Samba packages installed successfully."
+        else
+            echo "Error: Failed to install Samba packages. Exiting."
+            exit 1
+        fi
+        
         echo "Configuring Samba Server"
         smb_content="[PiDisk]
         path = /home/$USER/Media
@@ -144,6 +152,14 @@ fi
 # Configure VPN
 if ! step_completed "configure_vpn"; then
     if prompt_user "Configure VPN"; then
+        echo "Installing VPN packages"
+        if sudo apt-get -y install speedtest-cli jq wireguard-tools openvpn >/dev/null; then
+            echo "VPN packages installed successfully."
+        else
+            echo "Error: Failed to install VPN packages. Exiting."
+            exit 1
+        fi
+        
         echo "Cloning Important Repos"
         git clone https://github.com/pia-foss/manual-connections
 
@@ -152,7 +168,7 @@ if ! step_completed "configure_vpn"; then
 
         echo "Enter PIA Password:"
         read -r pia_password
-        touch .env
+        
 
         # Export VPN Credentials
         echo -e "\nexport PIA_USERNAME=$pia_username" | tee -a ".env"
@@ -174,6 +190,18 @@ git config --global user.email "$git_email"
 git config --global init.defaultBranch "main"
 git config --global pull.rebase true 
 git config --global core.editor "vim"
+
+# Install Docker
+if ! step_completed "install_docker"; then
+    if prompt_user "Install Docker"; then
+        echo "Installing Docker"
+        curl -sSL https://get.docker.com | sh
+        sudo usermod -aG docker $USER
+        mark_step_completed "install_docker"
+    fi
+else
+    echo "Docker already installed. Skipping."
+fi
 
 # Configure SSH Key
 ssh-keygen -t ed25519 -C "$USER@$(hostname).local" -f "/home/$USER/.ssh/id_ed25519" -P ""
@@ -207,9 +235,6 @@ EOL
 echo "$zsh_content" > ~/.zshrc
 echo "Added config to ~/.zshrc. Setting zsh as default shell"
 
-echo "Installing Docker"
-curl -sSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
 
 echo "Setting the shell to zsh, please enter your password when prompted."
 chsh -s /bin/zsh
