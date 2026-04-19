@@ -80,8 +80,12 @@ if ! step_completed "configure_media_server"; then
                    /etc/apt/trusted.gpg.d/plexmediaserver.gpg \
                    /etc/apt/sources.list.d/plexmediaserver.list
 
+        # Plex signs the repo InRelease with a SHA1 RSA key that Debian trixie's sqv rejects.
+        # The new Ed25519 key (PlexSign.v2.key) is only used by plexmediaserver >= 1.43.0 and is
+        # installed via the package itself. Until Plex re-signs the repo metadata, use trusted=yes
+        # to skip signature verification (HTTPS still authenticates the host).
         curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.v2.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/plex.gpg
-        echo "deb [signed-by=/usr/share/keyrings/plex.gpg] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
+        echo "deb [signed-by=/usr/share/keyrings/plex.gpg trusted=yes] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
         
         if sudo apt-get update && sudo apt-get -y install qbittorrent qbittorrent-nox plexmediaserver >/dev/null; then
             echo "Creating shared 'media' group for qBittorrent, Plex, and Samba"
