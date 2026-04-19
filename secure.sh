@@ -4,6 +4,8 @@ set -euo pipefail
 
 STATE_FILE="/tmp/secure_state.txt"
 LOCAL_NETWORK="192.168.1.0/24"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FILES_DIR="$SCRIPT_DIR/files"
 
 # Colors for output
 RED='\033[0;31m'
@@ -136,36 +138,8 @@ if ! step_completed "configure_fail2ban"; then
     if prompt_user "Configure Fail2ban jails"; then
         echo -e "${YELLOW}Configuring Fail2ban...${NC}"
 
-        sudo tee /etc/fail2ban/jail.local > /dev/null << EOF
-[DEFAULT]
-bantime = 1h
-findtime = 10m
-maxretry = 5
-ignoreip = 127.0.0.1/8 $LOCAL_NETWORK
-
-[sshd]
-enabled = true
-port = ssh
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-bantime = 2h
-
-[nginx-http-auth]
-enabled = true
-port = http,https
-filter = nginx-http-auth
-logpath = /var/log/nginx/error.log
-maxretry = 3
-
-[nginx-limit-req]
-enabled = true
-port = http,https
-filter = nginx-limit-req
-logpath = /var/log/nginx/error.log
-maxretry = 10
-bantime = 1h
-EOF
+        sudo install -m 644 /dev/stdin /etc/fail2ban/jail.local \
+            < <(sed "s|__LOCAL_NETWORK__|$LOCAL_NETWORK|g" "$FILES_DIR/fail2ban-jail.local")
 
         sudo systemctl restart fail2ban
         sleep 2
@@ -187,19 +161,7 @@ if ! step_completed "configure_nginx_security"; then
         if ! command -v nginx &> /dev/null; then
             echo "Nginx not installed. Skipping nginx security configuration."
         else
-            # Create security config
-            sudo tee /etc/nginx/conf.d/security.conf > /dev/null << 'EOF'
-# Rate Limiting Zones
-limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
-limit_req_zone $binary_remote_addr zone=general_limit:10m rate=30r/s;
-limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
-
-# Security Headers
-add_header X-Frame-Options "SAMEORIGIN" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-EOF
+            sudo install -m 644 "$FILES_DIR/nginx-security.conf" /etc/nginx/conf.d/security.conf
 
             # Test and reload nginx
             if sudo nginx -t; then

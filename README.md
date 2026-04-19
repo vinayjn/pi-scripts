@@ -15,8 +15,11 @@ cd pi-scripts
 # Security hardening (firewall, fail2ban)
 ./secure.sh -i
 
-# Remote access (Cloudflare tunnel, SSH, VNC)
-./remote-access.sh --tunnel-name 5pi --domain vinayjain.me -i
+# Remote access (Tailscale + TigerVNC)
+./remote-access.sh -i
+
+# Authenticate the Pi to your tailnet
+sudo tailscale up
 ```
 
 ## Scripts
@@ -67,134 +70,90 @@ Security hardening script.
 
 ### remote-access.sh
 
-Sets up secure remote access via Cloudflare Tunnel.
+Sets up secure remote access via Tailscale (WireGuard mesh VPN) and TigerVNC.
 
 **Configures:**
-- Cloudflare Tunnel for zero-trust access
-- Browser-based SSH (no port forwarding needed)
-- Browser-based VNC remote desktop
-- UFW firewall rules
+- Tailscale for private remote access from any device on your tailnet
+- TigerVNC server (macOS Screen Sharing compatible)
+- UFW rules allowing SSH + VNC on LAN and everything on `tailscale0`
 
 ```bash
-# Required: specify tunnel name and domain
-./remote-access.sh --tunnel-name 5pi --domain vinayjain.me
-
 # Interactive mode
-./remote-access.sh --tunnel-name 5pi --domain vinayjain.me -i
+./remote-access.sh -i
+
+# Run all steps
+./remote-access.sh
 
 # Custom local network
-./remote-access.sh --tunnel-name 5pi --domain vinayjain.me --local-network 10.0.0.0/24
+./remote-access.sh --local-network 10.0.0.0/24
 ```
+
+After install, run `sudo tailscale up` and open the printed URL to authenticate the Pi to your tailnet.
 
 ## Architecture
 
-After running all scripts, your Pi will have:
-
 ```
-Internet
-    │
-    ▼
-┌─────────────────────────────────────────────────────────┐
-│                   Cloudflare Edge                        │
-│  ┌─────────────────┬─────────────────┬────────────────┐ │
-│  │ 5pi.domain.com  │ pissh.domain.com│ pivnc.domain.com│ │
-│  │     (HTTP)      │     (SSH)       │     (VNC)      │ │
-│  └────────┬────────┴────────┬────────┴───────┬────────┘ │
-│           │    Cloudflare Access (Auth)      │          │
-└───────────┼─────────────────┼────────────────┼──────────┘
-            │                 │                │
-            ▼                 ▼                ▼
-    ┌───────────────────────────────────────────────┐
-    │              Cloudflare Tunnel                │
-    │           (outbound connection)               │
-    └───────────────────────┬───────────────────────┘
-                            │
-    ════════════════════════╪════════════════════════════
-                  Home Network (NAT)
-    ════════════════════════╪════════════════════════════
-                            │
-                            ▼
-    ┌───────────────────────────────────────────────┐
-    │              Raspberry Pi                     │
-    │  ┌─────────────────────────────────────────┐  │
-    │  │            cloudflared                  │  │
-    │  │  (connects to Cloudflare, routes to    │  │
-    │  │   localhost services)                  │  │
-    │  └──────┬──────────┬──────────┬───────────┘  │
-    │         │          │          │              │
-    │         ▼          ▼          ▼              │
-    │    ┌────────┐ ┌────────┐ ┌────────┐         │
-    │    │ nginx  │ │  sshd  │ │  VNC   │         │
-    │    │ :80    │ │  :22   │ │ :5901  │         │
-    │    └────────┘ └────────┘ └────────┘         │
-    │                                              │
-    │  ┌─────────────────────────────────────────┐ │
-    │  │              UFW Firewall               │ │
-    │  │  - Blocks all incoming from internet   │ │
-    │  │  - Allows localhost (for tunnel)       │ │
-    │  │  - Allows local network (192.168.1.x)  │ │
-    │  └─────────────────────────────────────────┘ │
-    └───────────────────────────────────────────────┘
+┌───────────────────────────┐        ┌───────────────────────────┐
+│  Any device in tailnet    │        │  Device on home LAN       │
+│  (laptop, phone, …)       │        │  (mac, phone, …)          │
+└────────────┬──────────────┘        └────────────┬──────────────┘
+             │ WireGuard                          │ LAN (192.168.x)
+             │ via Tailscale                      │
+             ▼                                    ▼
+    ┌────────────────────────────────────────────────────────┐
+    │                    Raspberry Pi                         │
+    │  ┌──────────────────────────────────────────────────┐  │
+    │  │                    UFW Firewall                   │  │
+    │  │  - deny all incoming from internet                │  │
+    │  │  - allow all on tailscale0                        │  │
+    │  │  - allow 22, 5901 from 192.168.1.0/24             │  │
+    │  └────────┬──────────────┬──────────────┬────────────┘  │
+    │           ▼              ▼              ▼               │
+    │      ┌────────┐     ┌────────┐     ┌────────┐           │
+    │      │  sshd  │     │  VNC   │     │  Plex  │           │
+    │      │  :22   │     │ :5901  │     │ :32400 │           │
+    │      └────────┘     └────────┘     └────────┘           │
+    └────────────────────────────────────────────────────────┘
 ```
 
 ## Access Methods
 
-| Method | URL/Address | Use Case |
-|--------|-------------|----------|
-| Web SSH | `https://pissh.yourdomain.com` | SSH from any browser |
-| Web VNC | `https://pivnc.yourdomain.com` | Remote desktop from any browser |
-| Web Apps | `https://yourpi.yourdomain.com` | Jellyfin, qBittorrent UI, etc. |
-| Local SSH | `ssh user@192.168.1.x` | SSH when on home network |
+| Method | Address | Use Case |
+|--------|---------|----------|
+| SSH via Tailscale | `ssh user@<pi-tailscale-name>` | From any device in your tailnet |
+| VNC via Tailscale | `vnc://<pi-tailscale-name>:5901` | Remote desktop from any device in your tailnet |
+| SSH on LAN | `ssh user@192.168.1.x` | At home |
+| VNC on LAN | `vnc://192.168.1.x:5901` | macOS Screen Sharing at home |
+| Samba on LAN | `smb://192.168.1.x/PiDisk` | File share at home |
 
 ## Security Features
 
-1. **No exposed ports** - All access goes through Cloudflare Tunnel (outbound only)
-2. **Zero Trust authentication** - Cloudflare Access requires email verification
-3. **UFW Firewall** - Blocks all incoming connections except local network
-4. **Fail2ban** - Protects against brute force attacks
-5. **SSH key authentication** - Password auth is optional (via Cloudflare Access)
-
-## Post-Setup: Cloudflare Access Configuration
-
-After running `remote-access.sh`, you must configure Cloudflare Access:
-
-1. Go to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/)
-
-2. **For SSH Access:**
-   - Navigate to Access → Applications → Add application
-   - Type: Self-hosted
-   - Application domain: `pissh.yourdomain.com`
-   - Add policy: Allow emails ending in `@youremail.com`
-   - Additional settings → Browser rendering: **SSH**
-
-3. **For VNC Access:**
-   - Navigate to Access → Applications → Add application
-   - Type: Self-hosted
-   - Application domain: `pivnc.yourdomain.com`
-   - Add policy: Allow your email
-   - Additional settings → Browser rendering: **VNC**
+1. **No exposed ports** — remote access is over a WireGuard tunnel (Tailscale); no inbound port on the router
+2. **UFW firewall** — blocks all incoming except LAN + `tailscale0`
+3. **Fail2ban** — brute-force protection for SSH and nginx
+4. **SSH key authentication** — generated during `setup.sh`
 
 ## Troubleshooting
 
 ### Check service status
 ```bash
-sudo systemctl status cloudflared
 sudo systemctl status vncserver@1
 sudo systemctl status fail2ban
+tailscale status
 sudo ufw status
 ```
 
 ### View logs
 ```bash
-journalctl -u cloudflared -f
 journalctl -u vncserver@1 -f
+journalctl -u tailscaled -f
 sudo fail2ban-client status sshd
 ```
 
 ### Restart services
 ```bash
-sudo systemctl restart cloudflared
 sudo systemctl restart vncserver@1
+sudo systemctl restart tailscaled
 ```
 
 ### Reset state files (to re-run scripts)
