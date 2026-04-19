@@ -15,7 +15,7 @@ cd pi-scripts
 # Security hardening (firewall, fail2ban)
 ./secure.sh -i
 
-# Remote access (Tailscale + TigerVNC)
+# Remote access (Tailscale + wayvnc)
 ./remote-access.sh -i
 
 # Authenticate the Pi to your tailnet
@@ -69,11 +69,11 @@ Security hardening script.
 
 ### remote-access.sh
 
-Sets up secure remote access via Tailscale (WireGuard mesh VPN) and TigerVNC.
+Sets up secure remote access via Tailscale (WireGuard mesh VPN) and the Pi's built-in wayvnc server.
 
 **Configures:**
 - Tailscale for private remote access from any device on your tailnet
-- TigerVNC server (macOS Screen Sharing compatible)
+- Desktop auto-login + built-in VNC (wayvnc, port 5900) via `raspi-config`
 - UFW rules allowing SSH + VNC on LAN and everything on `tailscale0`
 
 ```bash
@@ -141,12 +141,12 @@ docker compose exec gluetun wget -qO- https://ipinfo.io/ip
     │  │                    UFW Firewall                   │  │
     │  │  - deny all incoming from internet                │  │
     │  │  - allow all on tailscale0                        │  │
-    │  │  - allow 22, 5901 from 192.168.1.0/24             │  │
+    │  │  - allow 22, 5900 from 192.168.1.0/24             │  │
     │  └────────┬──────────────┬──────────────┬────────────┘  │
     │           ▼              ▼              ▼               │
     │      ┌────────┐     ┌────────┐     ┌────────┐           │
     │      │  sshd  │     │  VNC   │     │  Plex  │           │
-    │      │  :22   │     │ :5901  │     │ :32400 │           │
+    │      │  :22   │     │ :5900  │     │ :32400 │           │
     │      └────────┘     └────────┘     └────────┘           │
     └────────────────────────────────────────────────────────┘
 ```
@@ -156,9 +156,9 @@ docker compose exec gluetun wget -qO- https://ipinfo.io/ip
 | Method | Address | Use Case |
 |--------|---------|----------|
 | SSH via Tailscale | `ssh user@<pi-tailscale-name>` | From any device in your tailnet |
-| VNC via Tailscale | `vnc://<pi-tailscale-name>:5901` | Remote desktop from any device in your tailnet |
+| VNC via Tailscale | `vnc://<pi-tailscale-name>:5900` | Remote desktop from any device in your tailnet |
 | SSH on LAN | `ssh user@192.168.1.x` | At home |
-| VNC on LAN | `vnc://192.168.1.x:5901` | macOS Screen Sharing at home |
+| VNC on LAN | `vnc://192.168.1.x:5900` | macOS Screen Sharing at home |
 | Samba on LAN | `smb://192.168.1.x/PiDisk` | File share at home |
 
 ## Security Features
@@ -172,7 +172,7 @@ docker compose exec gluetun wget -qO- https://ipinfo.io/ip
 
 ### Check service status
 ```bash
-sudo systemctl status vncserver@1
+sudo systemctl status wayvnc
 sudo systemctl status fail2ban
 tailscale status
 sudo ufw status
@@ -180,14 +180,14 @@ sudo ufw status
 
 ### View logs
 ```bash
-journalctl -u vncserver@1 -f
+journalctl -u wayvnc -f
 journalctl -u tailscaled -f
 sudo fail2ban-client status sshd
 ```
 
 ### Restart services
 ```bash
-sudo systemctl restart vncserver@1
+sudo systemctl restart wayvnc
 sudo systemctl restart tailscaled
 ```
 
