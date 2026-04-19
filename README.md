@@ -30,11 +30,10 @@ Initial setup script for a fresh Raspberry Pi.
 
 **Installs:**
 - Basic packages (git, vim, curl, zsh)
-- Plex Media Server
-- qBittorrent
 - Samba file sharing
 - Docker
 - Oh My ZSH with plugins
+- Shared `media` group and `/media/plexmedia` directory
 
 ```bash
 # Interactive mode (prompts for each step)
@@ -89,6 +88,42 @@ Sets up secure remote access via Tailscale (WireGuard mesh VPN) and TigerVNC.
 ```
 
 After install, run `sudo tailscale up` and open the printed URL to authenticate the Pi to your tailnet.
+
+### docker/media-server
+
+Plex + qBittorrent + [gluetun](https://github.com/qdm12/gluetun) (NordVPN). qBittorrent shares gluetun's network namespace, so torrent traffic can only leave via the VPN. Plex runs on host networking — unaffected by the VPN and reachable on its usual ports for LAN discovery.
+
+**First-time setup:**
+
+```bash
+cd docker/media-server
+cp .env.example .env
+
+# Fill in PUID/PGID so files land as vj:media
+sed -i "s/^PUID=.*/PUID=$(id -u)/" .env
+sed -i "s/^PGID=.*/PGID=$(getent group media | cut -d: -f3)/" .env
+
+# Edit .env: NordVPN service credentials, QBT_USER / QBT_PASS, optional PLEX_CLAIM
+#   Nord creds: Account -> Services -> NordVPN -> Manual setup -> Service credentials
+#   Plex claim: https://plex.tv/claim (valid ~4 min; leave empty to set up manually)
+vim .env
+
+docker compose up -d
+docker compose logs -f gluetun    # wait until you see "connected"; Ctrl-C
+
+# Apply the qBittorrent WebUI credentials from .env
+./set-password.sh
+```
+
+- qBittorrent WebUI: `http://<pi-ip>:8080` (log in with `QBT_USER` / `QBT_PASS`)
+- Plex: `http://<pi-ip>:32400/web`
+
+**Verify qBittorrent really is behind Nord:**
+
+```bash
+# Should show a Nord exit IP, not your home IP
+docker compose exec gluetun wget -qO- https://ipinfo.io/ip
+```
 
 ## Architecture
 
