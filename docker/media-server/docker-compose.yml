@@ -1,0 +1,55 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8080:8080       # qBittorrent WebUI (published through gluetun's netns)
+      - 6881:6881       # BitTorrent peer port
+      - 6881:6881/udp
+    volumes:
+      - ./gluetun:/gluetun
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=${NORDVPN_USER}
+      - OPENVPN_PASSWORD=${NORDVPN_PASSWORD}
+      - SERVER_COUNTRIES=${VPN_COUNTRY:-United Kingdom}
+      - TZ=${TZ:-Europe/London}
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./qbittorrent:/config
+      - /media/plexmedia:/downloads
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ:-Europe/London}
+      - WEBUI_PORT=8080
+    restart: unless-stopped
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    volumes:
+      - ./plex:/config
+      - /media/plexmedia:/media
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ:-Europe/London}
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM:-}
+    restart: unless-stopped

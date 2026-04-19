@@ -69,49 +69,15 @@ else
     echo "Packages already installed. Skipping."
 fi
 
-# Configure as Media Server
-if ! step_completed "configure_media_server"; then
-    if prompt_user "Configure as Media Server"; then
-        echo "Installing Plex"
-
-        echo "Removing any existing Plex repo keys and sources"
-        sudo rm -f /usr/share/keyrings/plex.gpg \
-                   /etc/apt/trusted.gpg.d/plex.gpg \
-                   /etc/apt/trusted.gpg.d/plexmediaserver.gpg \
-                   /etc/apt/sources.list.d/plexmediaserver.list
-
-        # Plex signs the repo InRelease with a SHA1 RSA key that Debian trixie's sqv rejects.
-        # The new Ed25519 key (PlexSign.v2.key) is only used by plexmediaserver >= 1.43.0 and is
-        # installed via the package itself. Until Plex re-signs the repo metadata, use trusted=yes
-        # to skip signature verification (HTTPS still authenticates the host).
-        curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.v2.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/plex.gpg
-        echo "deb [signed-by=/usr/share/keyrings/plex.gpg trusted=yes] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
-        
-        if sudo apt-get update && sudo apt-get -y install qbittorrent qbittorrent-nox plexmediaserver >/dev/null; then
-            echo "Creating shared 'media' group for qBittorrent, Plex, and Samba"
-            sudo groupadd -f media
-            sudo usermod -aG media "$USER"
-            if id plex >/dev/null 2>&1; then
-                sudo usermod -aG media plex
-            fi
-
-            echo "Installing qbittorrent systemd unit"
-            qbit_service="/etc/systemd/system/qbittorrent.service"
-            sudo install -m 644 /dev/stdin "$qbit_service" < <(sed "s/__USER__/$USER/g" "$FILES_DIR/qbittorrent.service")
-            sudo systemctl daemon-reload
-            if sudo systemctl enable --now qbittorrent; then
-                mark_step_completed "configure_media_server"
-            else
-                echo "Error: Failed to start or enable qbittorrent. Exiting."
-                exit 1
-            fi
-        else
-            echo "Error: Failed to install media server packages. Exiting."
-            exit 1
-        fi
+# Create shared media group used by the docker/media-server stack
+if ! step_completed "configure_media_group"; then
+    if prompt_user "Create shared 'media' group for the docker/media-server stack"; then
+        sudo groupadd -f media
+        sudo usermod -aG media "$USER"
+        mark_step_completed "configure_media_group"
     fi
 else
-    echo "Media server already configured. Skipping."
+    echo "Media group already configured. Skipping."
 fi
 
 # Configure Samba Server
@@ -128,9 +94,6 @@ if ! step_completed "configure_samba_server"; then
         echo "Configuring Samba Server"
         sudo groupadd -f media
         sudo usermod -aG media "$USER"
-        if id plex >/dev/null 2>&1; then
-            sudo usermod -aG media plex
-        fi
         sudo mkdir -p "/media/plexmedia"
         sudo chown "$USER:media" "/media/plexmedia"
         sudo chmod 2775 "/media/plexmedia"
