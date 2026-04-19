@@ -25,22 +25,22 @@ mark_step_completed() {
 
 # Add interactive mode option
 interactive=false
-ssh_local_only=false
+ssh_from_anywhere=false
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -i|--interactive) interactive=true ;;
-        --ssh-local-only) ssh_local_only=true ;;
+        --ssh-from-anywhere) ssh_from_anywhere=true ;;
         --local-network) LOCAL_NETWORK="$2"; shift ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -i, --interactive     Prompt before each step"
-            echo "  --ssh-local-only      Restrict SSH to local network only (default: allow from anywhere)"
-            echo "  --local-network CIDR  Set local network range (default: 192.168.1.0/24)"
-            echo "  -h, --help            Show this help message"
+            echo "  -i, --interactive      Prompt before each step"
+            echo "  --ssh-from-anywhere    Allow SSH from any IP (default: LAN-only; remote access via Tailscale)"
+            echo "  --local-network CIDR   Set local network range (default: 192.168.1.0/24)"
+            echo "  -h, --help             Show this help message"
             exit 0
             ;;
         *) echo "Unknown parameter: $1"; exit 1 ;;
@@ -98,12 +98,12 @@ if ! step_completed "configure_ufw"; then
         sudo ufw allow from "$LOCAL_NETWORK" comment "Local network access"
 
         # Configure SSH access
-        if [ "$ssh_local_only" = true ]; then
-            echo "Restricting SSH to local network only..."
-            sudo ufw allow from "$LOCAL_NETWORK" to any port 22 comment "SSH local only"
-        else
+        if [ "$ssh_from_anywhere" = true ]; then
             echo "Allowing SSH from anywhere..."
             sudo ufw allow ssh
+        else
+            echo "Restricting SSH to local network only (Tailscale handles remote SSH)..."
+            sudo ufw allow from "$LOCAL_NETWORK" to any port 22 comment "SSH local only"
         fi
 
         # Enable UFW
@@ -193,16 +193,9 @@ fi
 
 # Disable unnecessary services
 if ! step_completed "disable_services"; then
-    if prompt_user "Disable unnecessary services (avahi, bluetooth)"; then
+    if prompt_user "Disable unnecessary services (bluetooth)"; then
         echo -e "${YELLOW}Disabling unnecessary services...${NC}"
 
-        # Disable Avahi (mDNS) if not needed
-        if systemctl is-active --quiet avahi-daemon 2>/dev/null; then
-            sudo systemctl disable --now avahi-daemon || true
-            echo "Disabled avahi-daemon"
-        fi
-
-        # Disable Bluetooth if not needed
         if systemctl is-active --quiet bluetooth 2>/dev/null; then
             sudo systemctl disable --now bluetooth || true
             echo "Disabled bluetooth"
@@ -228,7 +221,7 @@ echo "  sudo ufw status              - Check firewall status"
 echo "  sudo fail2ban-client status  - Check fail2ban jails"
 echo "  sudo fail2ban-client status sshd - Check SSH bans"
 echo ""
-if [ "$ssh_local_only" = false ]; then
+if [ "$ssh_from_anywhere" = true ]; then
     echo -e "${YELLOW}Note: SSH is accessible from the internet.${NC}"
     echo "To restrict SSH to local network only, run:"
     echo "  sudo ufw delete allow ssh"
