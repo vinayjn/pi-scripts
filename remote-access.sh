@@ -3,8 +3,6 @@
 set -euo pipefail
 
 STATE_FILE="/tmp/remote_access_state.txt"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FILES_DIR="$SCRIPT_DIR/files"
 
 # Colors for output
 RED='\033[0;31m'
@@ -30,7 +28,7 @@ while [[ "$#" -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
-            echo "Sets up remote access to Raspberry Pi via Tailscale + TigerVNC"
+            echo "Sets up remote access to Raspberry Pi via Tailscale + built-in VNC (wayvnc)"
             echo ""
             echo "Options:"
             echo "  -i, --interactive        Prompt before each step"
@@ -75,43 +73,24 @@ else
     echo "Tailscale already installed. Skipping."
 fi
 
-# Install VNC
-if ! step_completed "install_vnc"; then
-    if prompt_user "Install VNC server"; then
-        echo -e "${YELLOW}Installing TigerVNC...${NC}"
-        sudo apt-get install -y tigervnc-standalone-server tigervnc-common >/dev/null
-
-        mkdir -p ~/.vnc
-        install -m 755 "$FILES_DIR/vnc-xstartup" ~/.vnc/xstartup
-
-        echo ""
-        echo -e "${YELLOW}Set your VNC password:${NC}"
-        tigervncpasswd
-
-        echo -e "${GREEN}VNC installed.${NC}"
-        mark_step_completed "install_vnc"
+# Enable desktop auto-login so wayvnc has a session to share
+if ! step_completed "enable_autologin"; then
+    if prompt_user "Enable desktop auto-login (needed for wayvnc to share the session)"; then
+        sudo raspi-config nonint do_boot_behaviour B4
+        mark_step_completed "enable_autologin"
     fi
 else
-    echo "VNC already installed. Skipping."
+    echo "Auto-login already configured. Skipping."
 fi
 
-# VNC service
-if ! step_completed "vnc_service"; then
-    if prompt_user "Configure VNC as system service"; then
-        echo -e "${YELLOW}Creating VNC service...${NC}"
-
-        USER=$(whoami)
-        sudo install -m 644 /dev/stdin /etc/systemd/system/vncserver@.service \
-            < <(sed "s|__USER__|$USER|g" "$FILES_DIR/vncserver@.service")
-
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now vncserver@1
-
-        echo -e "${GREEN}VNC service installed and started.${NC}"
-        mark_step_completed "vnc_service"
+# Enable the built-in VNC server (wayvnc on Pi OS trixie+)
+if ! step_completed "enable_vnc"; then
+    if prompt_user "Enable built-in VNC (wayvnc)"; then
+        sudo raspi-config nonint do_vnc 0
+        mark_step_completed "enable_vnc"
     fi
 else
-    echo "VNC service already configured. Skipping."
+    echo "VNC already enabled. Skipping."
 fi
 
 # Firewall
@@ -133,8 +112,8 @@ if ! step_completed "configure_firewall"; then
         # SSH from LAN
         sudo ufw allow from "$LOCAL_NETWORK" to any port 22 comment "SSH local only"
 
-        # VNC from LAN (macOS Screen Sharing)
-        sudo ufw allow from "$LOCAL_NETWORK" to any port 5901 comment "VNC local only"
+        # VNC from LAN (macOS Screen Sharing via wayvnc on port 5900)
+        sudo ufw allow from "$LOCAL_NETWORK" to any port 5900 comment "VNC local only"
 
         echo "y" | sudo ufw enable
 
@@ -153,11 +132,12 @@ echo ""
 echo "Access your Pi remotely:"
 echo ""
 echo "  On LAN:         ssh $(whoami)@$(hostname -I | awk '{print $1}')"
-echo "                  vnc://$(hostname -I | awk '{print $1}'):5901"
+echo "                  vnc://$(hostname -I | awk '{print $1}'):5900"
 echo "  Via Tailscale:  ssh $(whoami)@<pi-tailscale-name>"
-echo "                  vnc://<pi-tailscale-name>:5901"
+echo "                  vnc://<pi-tailscale-name>:5900"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "  1. Run: sudo tailscale up"
 echo "  2. Open the printed URL in a browser and authenticate"
 echo "  3. Check status: tailscale status"
+echo "  4. Reboot for desktop auto-login to take effect: sudo reboot"
