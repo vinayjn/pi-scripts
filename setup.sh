@@ -72,8 +72,8 @@ if ! step_completed "configure_media_server"; then
     if prompt_user "Configure as Media Server"; then
         echo "Installing Plex"    
 
-        curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/plex.gpg
-        echo "deb [signed-by=/usr/share/keyrings/plex.gpg trusted=yes] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
+        curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.v2.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/plex.gpg
+        echo "deb [signed-by=/usr/share/keyrings/plex.gpg] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
         
         if sudo apt-get update && sudo apt-get -y install qbittorrent qbittorrent-nox plexmediaserver >/dev/null; then
             echo "Installing qbittorrent"
@@ -124,7 +124,8 @@ if ! step_completed "configure_samba_server"; then
         
         echo "Configuring Samba Server"
         # Create Media directory if it doesn't exist
-        mkdir -p "/media/plexmedia"
+        sudo mkdir -p "/media/plexmedia"
+        sudo chown "$USER:$USER" "/media/plexmedia"
         
         smb_content="[PiDisk]
         path = /media/plexmedia
