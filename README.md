@@ -30,7 +30,6 @@ Initial setup script for a fresh Raspberry Pi.
 - Plex Media Server
 - qBittorrent
 - Samba file sharing
-- PIA VPN
 - Docker
 - Oh My ZSH with plugins
 
@@ -85,15 +84,6 @@ Sets up secure remote access via Cloudflare Tunnel.
 
 # Custom local network
 ./remote-access.sh --tunnel-name 5pi --domain vinayjain.me --local-network 10.0.0.0/24
-```
-
-### vpn-connect.sh
-
-Connect/disconnect from PIA VPN.
-
-```bash
-./vpn-connect.sh start
-./vpn-connect.sh stop
 ```
 
 ## Architecture
@@ -212,15 +202,6 @@ sudo systemctl restart vncserver@1
 rm /tmp/setup_state.txt
 rm /tmp/secure_state.txt
 rm /tmp/remote_access_state.txt
-```
-
-## Environment Variables
-
-Create `~/.env` with your credentials:
-
-```bash
-export PIA_USERNAME=your_pia_username
-export PIA_PASS=your_pia_password
 ```
 
 ## License
