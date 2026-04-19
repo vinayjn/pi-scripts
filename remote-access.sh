@@ -86,7 +86,7 @@ if ! step_completed "install_vnc"; then
 
         echo ""
         echo -e "${YELLOW}Set your VNC password:${NC}"
-        vncpasswd
+        tigervncpasswd
 
         echo -e "${GREEN}VNC installed.${NC}"
         mark_step_completed "install_vnc"
