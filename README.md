@@ -61,8 +61,8 @@ Security hardening script.
 # Run all steps
 ./secure.sh
 
-# Restrict SSH to local network only
-./secure.sh --ssh-local-only
+# Allow SSH from the internet (default is LAN-only; remote access uses Tailscale)
+./secure.sh --ssh-from-anywhere
 
 # Custom local network range
 ./secure.sh --local-network 10.0.0.0/24
