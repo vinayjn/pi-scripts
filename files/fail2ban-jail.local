@@ -8,21 +8,6 @@ ignoreip = 127.0.0.1/8 __LOCAL_NETWORK__
 enabled = true
 port = ssh
 filter = sshd
-logpath = /var/log/auth.log
+backend = systemd
 maxretry = 3
 bantime = 2h
-
-[nginx-http-auth]
-enabled = true
-port = http,https
-filter = nginx-http-auth
-logpath = /var/log/nginx/error.log
-maxretry = 3
-
-[nginx-limit-req]
-enabled = true
-port = http,https
-filter = nginx-limit-req
-logpath = /var/log/nginx/error.log
-maxretry = 10
-bantime = 1h

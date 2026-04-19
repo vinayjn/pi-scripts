@@ -141,9 +141,22 @@ if ! step_completed "configure_fail2ban"; then
         sudo install -m 644 /dev/stdin /etc/fail2ban/jail.local \
             < <(sed "s|__LOCAL_NETWORK__|$LOCAL_NETWORK|g" "$FILES_DIR/fail2ban-jail.local")
 
+        if command -v nginx &> /dev/null; then
+            sudo install -m 644 "$FILES_DIR/fail2ban-jail-nginx.local" /etc/fail2ban/jail.d/nginx.local
+            echo "Installed nginx fail2ban jails."
+        else
+            sudo rm -f /etc/fail2ban/jail.d/nginx.local
+            echo "Nginx not installed. Skipping nginx jails."
+        fi
+
         sudo systemctl restart fail2ban
-        sleep 2
-        sudo fail2ban-client status
+
+        # Wait up to 10s for the socket to appear before calling the client
+        for _ in $(seq 1 10); do
+            [ -S /var/run/fail2ban/fail2ban.sock ] && break
+            sleep 1
+        done
+        sudo fail2ban-client status || sudo journalctl -u fail2ban -n 30 --no-pager
 
         echo -e "${GREEN}Fail2ban configured successfully.${NC}"
         mark_step_completed "configure_fail2ban"
