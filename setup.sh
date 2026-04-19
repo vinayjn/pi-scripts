@@ -4,6 +4,8 @@ set -euo pipefail
 
 USER=$(whoami)
 STATE_FILE="/tmp/setup_state.txt"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FILES_DIR="$SCRIPT_DIR/files"
 
 # Function to check if a step has been completed
 step_completed() {
@@ -70,33 +72,30 @@ fi
 # Configure as Media Server
 if ! step_completed "configure_media_server"; then
     if prompt_user "Configure as Media Server"; then
-        echo "Installing Plex"    
+        echo "Installing Plex"
 
-        curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/plex.gpg
-        echo "deb [signed-by=/usr/share/keyrings/plex.gpg trusted=yes] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
+        echo "Removing any existing Plex repo keys and sources"
+        sudo rm -f /usr/share/keyrings/plex.gpg \
+                   /etc/apt/trusted.gpg.d/plex.gpg \
+                   /etc/apt/trusted.gpg.d/plexmediaserver.gpg \
+                   /etc/apt/sources.list.d/plexmediaserver.list
+
+        curl -fsSL https://downloads.plex.tv/plex-keys/PlexSign.v2.key | sudo gpg --dearmor --yes -o /usr/share/keyrings/plex.gpg
+        echo "deb [signed-by=/usr/share/keyrings/plex.gpg] https://downloads.plex.tv/repo/deb public main" | sudo tee /etc/apt/sources.list.d/plexmediaserver.list
         
         if sudo apt-get update && sudo apt-get -y install qbittorrent qbittorrent-nox plexmediaserver >/dev/null; then
-            echo "Installing qbittorrent"
-            qbit_content="[Unit]
-            Description=qBittorrent
-            After=network.target
+            echo "Creating shared 'media' group for qBittorrent, Plex, and Samba"
+            sudo groupadd -f media
+            sudo usermod -aG media "$USER"
+            if id plex >/dev/null 2>&1; then
+                sudo usermod -aG media plex
+            fi
 
-            [Service]
-            Type=forking
-            User=$USER
-            Group=$USER
-            UMask=002
-            ExecStart=/usr/bin/qbittorrent-nox -d --webui-port=8080
-            Restart=on-failure
-
-            [Install]
-            WantedBy=multi-user.target
-            "
+            echo "Installing qbittorrent systemd unit"
             qbit_service="/etc/systemd/system/qbittorrent.service"
-            echo "$qbit_content" | sudo tee -a "$qbit_service"
-            echo "Content added to $qbit_service successfully."
-            cat $qbit_service
-            if sudo systemctl start qbittorrent && sudo systemctl enable qbittorrent; then
+            sudo install -m 644 /dev/stdin "$qbit_service" < <(sed "s/__USER__/$USER/g" "$FILES_DIR/qbittorrent.service")
+            sudo systemctl daemon-reload
+            if sudo systemctl enable --now qbittorrent; then
                 mark_step_completed "configure_media_server"
             else
                 echo "Error: Failed to start or enable qbittorrent. Exiting."
@@ -123,65 +122,30 @@ if ! step_completed "configure_samba_server"; then
         fi
         
         echo "Configuring Samba Server"
-        # Create Media directory if it doesn't exist
-        mkdir -p "/media/plexmedia"
-        
-        smb_content="[PiDisk]
-        path = /media/plexmedia
-        writeable = Yes
-        create mask = 0777
-        directory mask = 0777
-        public = no
-        "
-        smb_conf="/etc/samba/smb.conf"
-        if [ -f "$smb_conf" ]; then
-            echo "File $smb_conf already exists. Appending the content."
-        else
-            echo "Creating new file $smb_conf."
-            sudo touch "$smb_conf"
+        sudo groupadd -f media
+        sudo usermod -aG media "$USER"
+        if id plex >/dev/null 2>&1; then
+            sudo usermod -aG media plex
         fi
-        echo "$smb_content" | sudo tee -a "$smb_conf"
-        echo "Content added to $smb_conf successfully."
-        cat $smb_conf
+        sudo mkdir -p "/media/plexmedia"
+        sudo chown "$USER:media" "/media/plexmedia"
+        sudo chmod 2775 "/media/plexmedia"
+
+        smb_conf="/etc/samba/smb.conf"
+        if grep -q '^\[PiDisk\]' "$smb_conf" 2>/dev/null; then
+            echo "[PiDisk] share already present in $smb_conf. Skipping append."
+        else
+            echo "" | sudo tee -a "$smb_conf" >/dev/null
+            sudo tee -a "$smb_conf" < "$FILES_DIR/smb-pidisk.conf" >/dev/null
+            echo "[PiDisk] share appended to $smb_conf."
+        fi
+
         sudo smbpasswd -a "$USER"
         sudo systemctl restart smbd
         mark_step_completed "configure_samba_server"
     fi
 else
     echo "Samba server already configured. Skipping."
-fi
-
-touch $HOME/.env
-
-# Configure VPN
-if ! step_completed "configure_vpn"; then
-    if prompt_user "Configure VPN"; then
-        echo "Installing VPN packages"
-        if sudo apt-get -y install speedtest-cli jq wireguard-tools openvpn >/dev/null; then
-            echo "VPN packages installed successfully."
-        else
-            echo "Error: Failed to install VPN packages. Exiting."
-            exit 1
-        fi
-        
-        echo "Cloning Important Repos"
-        if [ ! -d "manual-connections" ]; then
-            git clone https://github.com/pia-foss/manual-connections
-        else
-            echo "manual-connections directory already exists. Skipping clone."
-        fi
-
-        echo "Enter PIA Username:"
-        read -r pia_username
-
-        echo "Enter PIA Password:"
-        read -r pia_password
-        echo -e "\nexport PIA_USERNAME=$pia_username" | tee -a "$HOME/.env"
-        echo -e "\nexport PIA_PASS=$pia_password" | tee -a "$HOME/.env"
-        mark_step_completed "configure_vpn"
-    fi
-else
-    echo "VPN already configured. Skipping."
 fi
 
 # Configure Git
@@ -264,7 +228,6 @@ plugins=(
     zsh-syntax-highlighting
 )
 source "$ZSH/oh-my-zsh.sh"
-source "$HOME/.env"
 
 EOL
     )
