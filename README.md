@@ -91,7 +91,7 @@ After install, run `sudo tailscale up` and open the printed URL to authenticate 
 
 ### docker/media-server
 
-Plex + qBittorrent + [gluetun](https://github.com/qdm12/gluetun) (NordVPN). qBittorrent shares gluetun's network namespace, so torrent traffic can only leave via the VPN. Plex runs on host networking — unaffected by the VPN and reachable on its usual ports for LAN discovery.
+Plex + qBittorrent + Stremio streaming server + [gluetun](https://github.com/qdm12/gluetun) (NordVPN). qBittorrent and Stremio share gluetun's network namespace, so torrent traffic can only leave via the VPN. Plex runs on host networking — unaffected by the VPN and reachable on its usual ports for LAN discovery.
 
 **First-time setup:**
 
@@ -117,8 +117,11 @@ docker compose logs -f gluetun    # wait until you see "connected"; Ctrl-C
 
 - qBittorrent WebUI: `http://<pi-ip>:8080` (log in with `QBT_USER` / `QBT_PASS`)
 - Plex: `http://<pi-ip>:32400/web`
+- Stremio streaming server: `http://<pi-ip>:11470`
 
-**Verify qBittorrent really is behind Nord:**
+**Point Stremio at the Pi:** in each Stremio app, go to *Settings → Streaming server URL* and set it to `http://<pi-ip>:11470` (or the Pi's Tailscale name/IP when away from home). Torrent streams then run on the Pi through NordVPN instead of on the playing device. The browser app (web.stremio.com) requires HTTPS — use `https://<pi-ip>:12470` and open it once directly to accept the self-signed certificate. The Pi is weak at transcoding, so streams that play directly work best.
+
+**Verify qBittorrent and Stremio really are behind Nord:**
 
 ```bash
 # Should show a Nord exit IP, not your home IP
